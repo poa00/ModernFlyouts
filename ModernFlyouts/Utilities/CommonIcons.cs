@@ -77,7 +77,5 @@
         public const string Blocked = "\uE25B";
 
         public const string Layout = "\uECA5";
-
-        public const string BatteryDefault = "\uE857";
     }
 }
