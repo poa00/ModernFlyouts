@@ -34,7 +34,7 @@ namespace ModernFlyouts.Core.Interop
 
     public delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
-    public class BandWindow : ContentControl
+    public class BandWindow : ContentControl, IWndProcObject
     {
         private readonly WndProc delegWndProc;
 
@@ -288,7 +288,7 @@ namespace ModernFlyouts.Core.Interop
             delegWndProc = myWndProc;
             SizeChanged += BandWindow_SizeChanged;
 
-            hookManager = WndProcHookManager.RegisterForBandWindow(this);
+            hookManager = WndProcHookManager.RegisterForIWndProcObject(this);
         }
 
         private void BandWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -347,13 +347,12 @@ namespace ModernFlyouts.Core.Interop
 
             hookManager.OnHwndCreated(hWnd);
 
-            //WindowCompositionHelper.MakeWindowTransparent(hWnd);
-
             HwndSourceParameters param = new()
             {
                 WindowStyle = (int)(WindowStyles.WS_VISIBLE | WindowStyles.WS_CHILD),
                 ParentWindow = hWnd,
-                UsesPerPixelTransparency = true
+                UsesPerPixelTransparency = true,
+                ExtendedWindowStyle = (int)(ExtendedWindowStyles.WS_EX_NOREDIRECTIONBITMAP)
             };
 
             hwndSource = new(param)

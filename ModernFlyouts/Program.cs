@@ -2,39 +2,43 @@
 using ModernFlyouts.Core.Interop;
 using ModernFlyouts.Helpers;
 using System;
-using System.Diagnostics;
 using System.Reflection;
+using System.Threading;
 
 namespace ModernFlyouts
 {
     public class Program
     {
         public const string AppName = "ModernFlyouts";
-        public const string AppLauncherName = "ModernFlyoutsLauncher";
+        public const string AppHostName = "ModernFlyouts";
 
         [STAThread]
         private static void Main(string[] args)
         {
-            AppLifecycleManager.StartApplication(args, () =>
-            {
-#if DEBUG
-                Debugger.Launch();
-#elif RELEASE
-                Microsoft.AppCenter.AppCenter.Start("26393d67-ab03-4e26-a6db-aa76bf989c21",
-                    typeof(Microsoft.AppCenter.Analytics.Analytics), typeof(Microsoft.AppCenter.Crashes.Crashes));
+            Thread thread = new(() => {
+                AppLifecycleManager.StartApplication(args, () =>
+                {
+#if RELEASE
+                    Microsoft.AppCenter.AppCenter.Start("26393d67-ab03-4e26-a6db-aa76bf989c21",
+                        typeof(Microsoft.AppCenter.Analytics.Analytics), typeof(Microsoft.AppCenter.Crashes.Crashes));
 #endif
-                InitializePrivateUseClasses();
+                    InitializePrivateUseClasses();
 
-                AppDataMigration.Perform();
+                    AppDataMigration.Perform();
 
-                NativeFlyoutHandler.Instance = new NativeFlyoutHandler();
-                NativeFlyoutHandler.Instance.Initialize();
+                    NativeFlyoutHandler.Instance = new NativeFlyoutHandler();
+                    NativeFlyoutHandler.Instance.Initialize();
 
-                LocalizationHelper.Initialize();
+                    LocalizationHelper.Initialize();
 
-                var app = new App();
-                app.Run();
+                    var app = new App();
+                    app.Run();
+                });
             });
+
+            //If you lauch directly from the host bridge it won't be STA.
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
         }
 
         internal static void RunCommand(RunCommandType runCommandType)

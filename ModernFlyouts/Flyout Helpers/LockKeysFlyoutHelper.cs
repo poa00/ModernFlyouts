@@ -1,4 +1,5 @@
-﻿using ModernFlyouts.Helpers;
+﻿using ModernFlyouts.Controls;
+using ModernFlyouts.Helpers;
 using ModernFlyouts.Utilities;
 using System.Windows.Input;
 
@@ -7,8 +8,6 @@ namespace ModernFlyouts
     public class LockKeysFlyoutHelper : FlyoutHelperBase
     {
         private LockKeysControl lockKeysControl;
-
-        public override event ShowFlyoutEventHandler ShowFlyoutRequested;
 
         #region Properties
 
@@ -124,12 +123,7 @@ namespace ModernFlyouts
                 }
 
                 Prepare(lk, !Keyboard.IsKeyToggled(key));
-                ShowFlyout();
-            }
-
-            void ShowFlyout()
-            {
-                ShowFlyoutRequested?.Invoke(this);
+                RequestShowFlyout();
             }
         }
 

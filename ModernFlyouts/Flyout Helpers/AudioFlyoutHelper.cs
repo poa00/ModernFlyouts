@@ -27,8 +27,6 @@ namespace ModernFlyouts
         private List<MediaSessionManager> mediaSessionManagers = new();
         private bool isVolumeFlyout = true;
 
-        public override event ShowFlyoutEventHandler ShowFlyoutRequested;
-
         #region Properties
 
         public CompositeCollection AllMediaSessions { get; } = new();
@@ -120,16 +118,22 @@ namespace ModernFlyouts
             OnEnabled();
         }
 
-        public void OnExternalUpdated(bool isMediaKey)
+        public override bool CanHandleNativeOnScreenFlyout(FlyoutTriggerData triggerData)
         {
-            isVolumeFlyout = !isMediaKey;
+            bool isMediaKey = triggerData.TriggerType == FlyoutTriggerType.Media;
+            isVolumeFlyout = triggerData.TriggerType == FlyoutTriggerType.Volume;
+            if (!isMediaKey && !isVolumeFlyout)
+                return false;
+
             ValidatePrimaryContentVisible();
             ValidateSecondaryContentVisible();
 
             if ((isVolumeFlyout && PrimaryContentVisible) || (isMediaKey && SecondaryContentVisible))
             {
-                ShowFlyoutRequested?.Invoke(this);
+                return true;
             }
+
+            return base.CanHandleNativeOnScreenFlyout(triggerData);
         }
 
         private void OnShowGSMTCInVolumeFlyoutChanged()
@@ -179,10 +183,8 @@ namespace ModernFlyouts
                     UpdateVolume(device.AudioEndpointVolume.MasterVolumeLevelScalar * 100);
                     device.AudioEndpointVolume.OnVolumeNotification += AudioEndpointVolume_OnVolumeNotification;
                 }
-                catch (Exception)
-                {
-                    //ignore
-                }
+                catch { }
+
                 Application.Current.Dispatcher.Invoke(() => PrimaryContent = volumeControl);
             }
             else { Application.Current.Dispatcher.Invoke(() => PrimaryContent = noDeviceMessageBlock); }
@@ -194,6 +196,23 @@ namespace ModernFlyouts
         }
 
         private bool _isInCodeValueChange; //Prevents a LOOP between changing volume.
+
+        private void _SliderSetVolume(double value, RoutedEventArgs e)
+        {
+            if (device == null) return;
+            try
+            {
+                device.AudioEndpointVolume.MasterVolumeLevelScalar = (float)(value / 100);
+            }
+            catch { } //99.9% is "A device attached to the system is not functioning" (0x8007001F), ignore this
+
+            if (value == 0 && !device.AudioEndpointVolume.Mute)
+                device.AudioEndpointVolume.Mute = true;
+            else if (value > 0 && device.AudioEndpointVolume.Mute)
+                device.AudioEndpointVolume.Mute = false;
+
+            e.Handled = true;
+        }
 
         private void UpdateVolume(double volume)
         {
@@ -222,12 +241,10 @@ namespace ModernFlyouts
                     volumeControl.VolumeGlyph.Glyph = CommonGlyphs.Volume2;
 
                 volumeControl.textVal.ClearValue(TextBlock.ForegroundProperty);
-                volumeControl.VolumeSlider.IsEnabled = true;
             }
             else
             {
                 volumeControl.textVal.SetResourceReference(TextBlock.ForegroundProperty, "SystemControlForegroundBaseMediumBrush");
-                volumeControl.VolumeSlider.IsEnabled = false;
                 volumeControl.VolumeShadowGlyph.Visibility = Visibility.Collapsed;
                 volumeControl.VolumeGlyph.Glyph = CommonGlyphs.Mute;
             }
@@ -245,18 +262,9 @@ namespace ModernFlyouts
                     return;
                 }
 
-                if (oldValue != value && device != null)
+                if (oldValue != value)
                 {
-                    try
-                    {
-                        device.AudioEndpointVolume.MasterVolumeLevelScalar = (float)(value / 100);
-                    }
-                    catch (Exception)
-                    {
-                        //99.9% is "A device attached to the system is not functioning" (0x8007001F), ignore this
-                    }
-
-                    e.Handled = true;
+                    _SliderSetVolume(value, e);
                 }
             }
         }
@@ -282,13 +290,11 @@ namespace ModernFlyouts
                 {
                     device.AudioEndpointVolume.MasterVolumeLevelScalar = (float)(volume / 100.0);
                 }
-                catch (Exception)
-                {
-                    //ignore
-                }
+                catch { }
 
                 e.Handled = true;
             }
+            _SliderSetVolume(volume, e);
         }
 
         #endregion
